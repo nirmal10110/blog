@@ -43,16 +43,19 @@ class ArticlesController < ApplicationController
   end
 
   def update
+    @article = Article.find(params[:id])
     if logged_in? && @article.user.eql?(current_user)
-      @article = Article.find(params[:id])
-
       if(@article.update(article_params))
         redirect_to @article
       else
         render :edit
       end
     else
-      render "session/new"
+      if logged_in?
+        redirect_to @article
+      else
+        render "session/new"
+      end
     end
   end
 
@@ -63,6 +66,17 @@ class ArticlesController < ApplicationController
     end
 
     redirect_to root_path
+  end
+
+  def search
+    query = params[:query]
+
+    if query
+      @articles = Article.search(query)
+      @articles.each do |article|
+        article.user = User.find(article.user_id)
+      end
+    end
   end
 
   private
