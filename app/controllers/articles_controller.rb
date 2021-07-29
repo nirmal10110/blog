@@ -1,10 +1,12 @@
+require 'json'
 class ArticlesController < ApplicationController
+  include ArticlesHelper
   def index
-    @articles = Article.all
-    # @articles = Article.paginate(page: params[:page], per_page: 5)
+    @articles = fetch_articles_redis
   end
 
   def show
+    # get_article_from_redis(params[:id])
     @article = Article.find(params[:id])
   end
 
@@ -22,6 +24,7 @@ class ArticlesController < ApplicationController
     if logged_in?
       @article.user = current_user
       if @article.save
+        save_to_redis(@article)
         flash[:notice] = "Article was successfully created"
         redirect_to @article
       else
@@ -46,6 +49,7 @@ class ArticlesController < ApplicationController
     @article = Article.find(params[:id])
     if logged_in? && @article.user.eql?(current_user)
       if(@article.update(article_params))
+        save_to_redis(@article)
         redirect_to @article
       else
         render :edit
@@ -62,9 +66,9 @@ class ArticlesController < ApplicationController
   def destroy
     @article = Article.find(params[:id])
     if(logged_in? && @article.user.eql?(current_user) )
+      delete_from_redis(params[:id])
       @article.destroy
     end
-
     redirect_to root_path
   end
 
@@ -72,11 +76,9 @@ class ArticlesController < ApplicationController
     query = params[:query]
 
     if query
-      @articles = Article.search(query)
-      @articles.each do |article|
-        article.user = User.find(article.user_id)
-      end
+      @articles = JSON.parse(Article.search(query).to_json)
     end
+    @articles = @articles.map{|article| article["_source"]}
   end
 
   private
