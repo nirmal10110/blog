@@ -1,6 +1,8 @@
 require 'json'
+
 class ArticlesController < ApplicationController
   include ArticlesHelper
+  @@admin_access_email = ["admin@gmail.com"]
   def index
     @articles = fetch_articles_redis
   end
@@ -37,21 +39,23 @@ class ArticlesController < ApplicationController
   end
 
   def edit
-    if logged_in?
+    @article = Article.find(params[:id])
+    if logged_in? && (@article.user.eql?(current_user) || @@admin_access_email.include?(current_user.email.downcase) )
       @article = Article.find(params[:id])
     else
-      render "sessions/new"
+      flash[:danger] = "You cant update other's articles"
+      redirect_to articles_path
     end
-
   end
 
   def update
     @article = Article.find(params[:id])
-    if logged_in? && @article.user.eql?(current_user)
+    if logged_in? && (@article.user.eql?(current_user) || @@admin_access_email.include?(current_user.email.downcase) )
       if(@article.update(article_params))
         save_to_redis(@article)
         redirect_to @article
       else
+        flash[:danger] = "There was a problem while updating the Article Please retry"
         render :edit
       end
     else
@@ -65,11 +69,12 @@ class ArticlesController < ApplicationController
 
   def destroy
     @article = Article.find(params[:id])
-    if(logged_in? && @article.user.eql?(current_user) )
+    if logged_in? && (@article.user.eql?(current_user) ||@@admin_access_email.include?(current_user.email.downcase))
       delete_from_redis(params[:id])
       @article.destroy
     end
-    redirect_to root_path
+    flash[:danger] = "You cant delete other's articles"
+    redirect_to articles_path
   end
 
   def search
